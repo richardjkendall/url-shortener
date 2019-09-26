@@ -1,0 +1,9 @@
+.DS_Store
+.terraform/**
+.venv/**
+.vscode/**
+
+function.zip
+target_lambda/**
+
+*.tfstate*
