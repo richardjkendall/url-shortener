@@ -1,19 +1,18 @@
 import logging
 from flask_lambda import FlaskLambda
 from flask import request, jsonify, make_response, g
+from flask_cors import CORS
 from error_handler import error_handler, BadRequestException, UnauthorisedException
 from random_string_gen import get_rand_string
-from dict_tools import FindKey
 from LinkObject import Link
 from datetime import datetime
 import json
 import os
-import pprint
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] (%(threadName)-10s) %(message)s')
 
 lambda_handler = FlaskLambda(__name__)
-pp = pprint.PrettyPrinter(indent=4)
+CORS(lambda_handler)
 
 def success_json_response(payload):
     """Turns payload into a JSON HTTP200 response"""
@@ -23,7 +22,7 @@ def success_json_response(payload):
 
 @lambda_handler.before_request
 def get_user_details():
-    #g.username = FindKey(request.__dict__).get("aws_event.requestContext.authorizer.claims.cognito:username")
+    #g.username = "rjk"
     try:
         g.username = request.aws_event["requestContext"]["authorizer"]["claims"]["cognito:username"]
     except KeyError as err:

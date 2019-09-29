@@ -181,6 +181,13 @@ resource "aws_api_gateway_integration" "lambda_root" {
     uri                     = "${aws_lambda_function.lambda.invoke_arn}"
 }
 
+module "cors" {
+  source = "github.com/squidfunk/terraform-aws-api-gateway-enable-cors"
+  
+  api_id          = "${aws_api_gateway_rest_api.apigw.id}"
+  api_resource_id = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
+}
+
 resource "aws_api_gateway_method" "proxy_root_get" {
     rest_api_id   = "${aws_api_gateway_rest_api.apigw.id}"
     resource_id   = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
