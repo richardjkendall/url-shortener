@@ -23,16 +23,16 @@ data "aws_route53_zone" "root_zone" {
 
 resource "null_resource" "lambda_packager" {
     triggers = {
-        always_run = "${base64sha256("lambda_function.py")}"
+        always_run = "${uuid()}"
     }
     provisioner "local-exec" {
         command = "mkdir -p ${path.root}/target_lambda"
     }
     provisioner "local-exec" {
-        command = "pip3 install --target=${path.root}/target_lambda -r requirements.txt"
+        command = "pip3 install --upgrade --target=${path.root}/target_lambda -r requirements.txt"
     }
     provisioner "local-exec" {
-        command = "cp -R ${path.root}/lambda_*.py ${path.root}/target_lambda/."
+        command = "cp -R ${path.root}/*.py ${path.root}/target_lambda/."
     }
 }
 
@@ -87,21 +87,12 @@ data "aws_iam_policy_document" "lambda_permissions" {
         actions     = [
             "dynamodb:PutItem",
             "dynamodb:GetItem",
-            "dynamodb:UpdateItem"
+            "dynamodb:UpdateItem",
+            "dynamodb:Query"
         ]
         resources   = [
-            "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/UrlShortenerLinks-${var.env}"
-        ]
-    }
-
-    statement {
-        sid         = ""
-        effect      = "Allow"
-        actions     = [
-            "dynamodb:GetItem",
-        ]
-        resources   = [
-            "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/UrlShortenerUsers-${var.env}"
+            "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/UrlShortenerLinks_${var.env}",
+            "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/UrlShortenerLinks_${var.env}/index/*"
         ]
     }
 }
@@ -175,7 +166,7 @@ resource "aws_api_gateway_integration" "lambda" {
 resource "aws_api_gateway_method" "proxy_root" {
     rest_api_id   = "${aws_api_gateway_rest_api.apigw.id}"
     resource_id   = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
-    http_method   = "GET"
+    http_method   = "POST"
     authorization = "COGNITO_USER_POOLS"
     authorizer_id = "${aws_api_gateway_authorizer.update_api_authoriser.id}"
 }
@@ -189,6 +180,24 @@ resource "aws_api_gateway_integration" "lambda_root" {
     type                    = "AWS_PROXY"
     uri                     = "${aws_lambda_function.lambda.invoke_arn}"
 }
+
+resource "aws_api_gateway_method" "proxy_root_get" {
+    rest_api_id   = "${aws_api_gateway_rest_api.apigw.id}"
+    resource_id   = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
+    http_method   = "GET"
+    authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "lambda_root_get" {
+    rest_api_id = "${aws_api_gateway_rest_api.apigw.id}"
+    resource_id = "${aws_api_gateway_method.proxy_root_get.resource_id}"
+    http_method = "${aws_api_gateway_method.proxy_root_get.http_method}"
+
+    integration_http_method = "POST"
+    type                    = "AWS_PROXY"
+    uri                     = "${aws_lambda_function.lambda.invoke_arn}"
+}
+
 
 resource "aws_lambda_permission" "lambda_permission" {
     action        = "lambda:InvokeFunction"
@@ -254,34 +263,32 @@ resource "aws_api_gateway_base_path_mapping" "api_endpoint_base_path_mapping" {
     base_path   = ""
 }
 
-resource "aws_dynamodb_table" "users_table" {
-    name            = "UrlShortenerUsers-${var.env}"
-    billing_mode    = "PAY_PER_REQUEST"
-    hash_key        = "UserId"
-
-    attribute {
-        name = "UserId"
-        type = "S"
-    }
-
-    point_in_time_recovery {
-        enabled = true
-    }
-}
-
 resource "aws_dynamodb_table" "links_table" {
-    name            = "UrlShortenerLinks-${var.env}"
+    name            = "UrlShortenerLinks_${var.env}"
     billing_mode    = "PAY_PER_REQUEST"
-    hash_key        = "LinkId"
+    hash_key        = "User_id"
+    range_key       = "Link_id"
 
     attribute {
-        name = "LinkId"
+        name = "User_id"
+        type = "S"
+    }
+
+    attribute {
+        name = "Link_id"
         type = "S"
     }
 
     point_in_time_recovery {
         enabled = true
     }
+
+    global_secondary_index {
+        name               = "UrlLinkIdIndex"
+        hash_key           = "Link_id"
+        projection_type    = "INCLUDE"
+        non_key_attributes = ["s_Url"]
+  }
 }
 
 resource "aws_cognito_user_pool" "user_pool" {

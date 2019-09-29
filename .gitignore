@@ -2,6 +2,7 @@
 .terraform/**
 .venv/**
 .vscode/**
+__pycache__/**
 
 function.zip
 target_lambda/**
