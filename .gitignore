@@ -6,5 +6,6 @@ __pycache__/**
 
 function.zip
 target_lambda/**
+env/**
 
 *.tfstate*
