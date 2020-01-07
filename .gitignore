@@ -9,3 +9,6 @@ target_lambda/**
 env/**
 
 *.tfstate*
+
+terraform.tfvars
+

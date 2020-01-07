@@ -1,5 +1,5 @@
 provider "aws" {
-    region = "${var.region}"
+    region = var.region
 }
 
 /*
@@ -23,7 +23,7 @@ data "aws_route53_zone" "root_zone" {
 
 resource "null_resource" "lambda_packager" {
     triggers = {
-        always_run = "${uuid()}"
+        always_run = uuid()
     }
     provisioner "local-exec" {
         command = "mkdir -p ${path.root}/target_lambda"
@@ -41,7 +41,7 @@ data "archive_file" "zip" {
     source_dir = "target_lambda/"
     output_path = "function.zip"
     depends_on = [
-        "null_resource.lambda_packager"
+        null_resource.lambda_packager
     ]
 }
 
@@ -99,26 +99,26 @@ data "aws_iam_policy_document" "lambda_permissions" {
 
 resource "aws_iam_policy" "policy" {
     name        = "UrlShortener-${var.env}-policy"
-    policy = "${data.aws_iam_policy_document.lambda_permissions.json}"
+    policy = data.aws_iam_policy_document.lambda_permissions.json
 }
 
 resource "aws_iam_role" "iam_for_lambda" {
     name               = "UrlShortener-${var.env}-role"
-    assume_role_policy = "${data.aws_iam_policy_document.assume_policy.json}"
+    assume_role_policy = data.aws_iam_policy_document.assume_policy.json
 }
 
 resource "aws_iam_role_policy_attachment" attach_policy_to_lambda_role {
-  role       = "${aws_iam_role.iam_for_lambda.name}"
-  policy_arn = "${aws_iam_policy.policy.arn}"
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.policy.arn
 }
 
 resource "aws_lambda_function" "lambda" {
     function_name       = "UrlShortener-${var.env}"
 
-    filename            = "${data.archive_file.zip.output_path}"
-    source_code_hash    = "${data.archive_file.zip.output_base64sha256}"
+    filename            = data.archive_file.zip.output_path
+    source_code_hash    = data.archive_file.zip.output_base64sha256
 
-    role                = "${aws_iam_role.iam_for_lambda.arn}"
+    role                = aws_iam_role.iam_for_lambda.arn
     handler             = "lambda_function.lambda_handler"
     runtime             = "python3.6"
     memory_size         = "256"
@@ -126,11 +126,11 @@ resource "aws_lambda_function" "lambda" {
 
     environment {
         variables = {
-            environment_name    = "${var.env}"
-            cog_client_id       = "${aws_cognito_user_pool_client.app_client.id}"
-            cog_client_secret   = "${aws_cognito_user_pool_client.app_client.client_secret}"
+            environment_name    = var.env
+            cog_client_id       = aws_cognito_user_pool_client.app_client.id
+            cog_client_secret   = aws_cognito_user_pool_client.app_client.client_secret
             cog_domain          = "${var.authdomain}-${var.env}"
-            region              = "${var.region}"
+            region              = var.region
         }
     }
 }
@@ -140,135 +140,135 @@ resource "aws_api_gateway_rest_api" "apigw" {
 }
 
 resource "aws_api_gateway_resource" "proxy" {
-    rest_api_id = "${aws_api_gateway_rest_api.apigw.id}"
-    parent_id   = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
+    rest_api_id = aws_api_gateway_rest_api.apigw.id
+    parent_id   = aws_api_gateway_rest_api.apigw.root_resource_id
     path_part   = "{proxy+}"
 }
 
 resource "aws_api_gateway_method" "proxy" {
-    rest_api_id   = "${aws_api_gateway_rest_api.apigw.id}"
-    resource_id   = "${aws_api_gateway_resource.proxy.id}"
+    rest_api_id   = aws_api_gateway_rest_api.apigw.id
+    resource_id   = aws_api_gateway_resource.proxy.id
     http_method   = "GET"
     authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "lambda" {
-    rest_api_id = "${aws_api_gateway_rest_api.apigw.id}"
-    resource_id = "${aws_api_gateway_method.proxy.resource_id}"
-    http_method = "${aws_api_gateway_method.proxy.http_method}"
+    rest_api_id = aws_api_gateway_rest_api.apigw.id
+    resource_id = aws_api_gateway_method.proxy.resource_id
+    http_method = aws_api_gateway_method.proxy.http_method
 
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
-    uri                     = "${aws_lambda_function.lambda.invoke_arn}"
+    uri                     = aws_lambda_function.lambda.invoke_arn
 }
 
 /* 
     This second block of method and integration is because the above method/integration cannot match an empty resource path
 */
 resource "aws_api_gateway_method" "proxy_root" {
-    rest_api_id   = "${aws_api_gateway_rest_api.apigw.id}"
-    resource_id   = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
+    rest_api_id   = aws_api_gateway_rest_api.apigw.id
+    resource_id   = aws_api_gateway_rest_api.apigw.root_resource_id
     http_method   = "POST"
     authorization = "COGNITO_USER_POOLS"
-    authorizer_id = "${aws_api_gateway_authorizer.update_api_authoriser.id}"
+    authorizer_id = aws_api_gateway_authorizer.update_api_authoriser.id
 }
 
 resource "aws_api_gateway_integration" "lambda_root" {
-    rest_api_id = "${aws_api_gateway_rest_api.apigw.id}"
-    resource_id = "${aws_api_gateway_method.proxy_root.resource_id}"
-    http_method = "${aws_api_gateway_method.proxy_root.http_method}"
+    rest_api_id = aws_api_gateway_rest_api.apigw.id
+    resource_id = aws_api_gateway_method.proxy_root.resource_id
+    http_method = aws_api_gateway_method.proxy_root.http_method
 
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
-    uri                     = "${aws_lambda_function.lambda.invoke_arn}"
+    uri                     = aws_lambda_function.lambda.invoke_arn
 }
 
 module "cors" {
   source = "github.com/squidfunk/terraform-aws-api-gateway-enable-cors"
 
-  api_id          = "${aws_api_gateway_rest_api.apigw.id}"
-  api_resource_id = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
+  api_id          = aws_api_gateway_rest_api.apigw.id
+  api_resource_id = aws_api_gateway_rest_api.apigw.root_resource_id
 }
 
 resource "aws_api_gateway_method" "proxy_root_get" {
-    rest_api_id   = "${aws_api_gateway_rest_api.apigw.id}"
-    resource_id   = "${aws_api_gateway_rest_api.apigw.root_resource_id}"
+    rest_api_id   = aws_api_gateway_rest_api.apigw.id
+    resource_id   = aws_api_gateway_rest_api.apigw.root_resource_id
     http_method   = "GET"
     authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "lambda_root_get" {
-    rest_api_id = "${aws_api_gateway_rest_api.apigw.id}"
-    resource_id = "${aws_api_gateway_method.proxy_root_get.resource_id}"
-    http_method = "${aws_api_gateway_method.proxy_root_get.http_method}"
+    rest_api_id = aws_api_gateway_rest_api.apigw.id
+    resource_id = aws_api_gateway_method.proxy_root_get.resource_id
+    http_method = aws_api_gateway_method.proxy_root_get.http_method
 
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
-    uri                     = "${aws_lambda_function.lambda.invoke_arn}"
+    uri                     = aws_lambda_function.lambda.invoke_arn
 }
 
 
 resource "aws_lambda_permission" "lambda_permission" {
     action        = "lambda:InvokeFunction"
-    function_name = "${aws_lambda_function.lambda.function_name}"
+    function_name = aws_lambda_function.lambda.function_name
     principal     = "apigateway.amazonaws.com"
     source_arn = "${aws_api_gateway_rest_api.apigw.execution_arn}/*/*/*"
 }
 
 resource "aws_api_gateway_deployment" "apigwdeploy" {
     depends_on = [
-        "aws_api_gateway_integration.lambda",
-        "aws_api_gateway_integration.lambda_root",
+        aws_api_gateway_integration.lambda,
+        aws_api_gateway_integration.lambda_root,
     ]
 
-    rest_api_id = "${aws_api_gateway_rest_api.apigw.id}"
+    rest_api_id = aws_api_gateway_rest_api.apigw.id
     stage_name  = "api"
     variables = {
-        env = "${var.env}"
+        env = var.env
     }
 }
 
 resource "aws_acm_certificate" "endpoint_cert" {
-    provider          = "aws.useast"
-    domain_name       = "${var.endpoint}"
+    provider          = aws.useast
+    domain_name       = var.endpoint
     validation_method = "DNS"
 }
 
 resource "aws_route53_record" "endpoint_cert_validation" {
-    name    = "${aws_acm_certificate.endpoint_cert.domain_validation_options.0.resource_record_name}"
-    type    = "${aws_acm_certificate.endpoint_cert.domain_validation_options.0.resource_record_type}"
-    zone_id = "${data.aws_route53_zone.root_zone.id}"
-    records = ["${aws_acm_certificate.endpoint_cert.domain_validation_options.0.resource_record_value}"]
+    name    = aws_acm_certificate.endpoint_cert.domain_validation_options.0.resource_record_name
+    type    = aws_acm_certificate.endpoint_cert.domain_validation_options.0.resource_record_type
+    zone_id = data.aws_route53_zone.root_zone.id
+    records = [aws_acm_certificate.endpoint_cert.domain_validation_options.0.resource_record_value]
     ttl     = 60
 }
 
 resource "aws_acm_certificate_validation" "cert_validation" {
-    provider                = "aws.useast"
-    certificate_arn         = "${aws_acm_certificate.endpoint_cert.arn}"
-    validation_record_fqdns = ["${aws_route53_record.endpoint_cert_validation.fqdn}"]
+    provider                = aws.useast
+    certificate_arn         = aws_acm_certificate.endpoint_cert.arn
+    validation_record_fqdns = [aws_route53_record.endpoint_cert_validation.fqdn]
 }
 
 resource "aws_api_gateway_domain_name" "api_endpoint_domain" {
-    certificate_arn = "${aws_acm_certificate_validation.cert_validation.certificate_arn}"
-    domain_name     = "${var.endpoint}"
+    certificate_arn = aws_acm_certificate_validation.cert_validation.certificate_arn
+    domain_name     = var.endpoint
 }
 
 resource "aws_route53_record" "api_endpoint_domain_r53" {
-    name    = "${aws_api_gateway_domain_name.api_endpoint_domain.domain_name}"
+    name    = aws_api_gateway_domain_name.api_endpoint_domain.domain_name
     type    = "A"
-    zone_id = "${data.aws_route53_zone.root_zone.id}"
+    zone_id = data.aws_route53_zone.root_zone.id
 
     alias {
         evaluate_target_health = true
-        name                   = "${aws_api_gateway_domain_name.api_endpoint_domain.cloudfront_domain_name}"
-        zone_id                = "${aws_api_gateway_domain_name.api_endpoint_domain.cloudfront_zone_id}"
+        name                   = aws_api_gateway_domain_name.api_endpoint_domain.cloudfront_domain_name
+        zone_id                = aws_api_gateway_domain_name.api_endpoint_domain.cloudfront_zone_id
     }
 }
 
 resource "aws_api_gateway_base_path_mapping" "api_endpoint_base_path_mapping" {
-    api_id      = "${aws_api_gateway_rest_api.apigw.id}"
-    stage_name  = "${aws_api_gateway_deployment.apigwdeploy.stage_name}"
-    domain_name = "${aws_api_gateway_domain_name.api_endpoint_domain.domain_name}"
+    api_id      = aws_api_gateway_rest_api.apigw.id
+    stage_name  = aws_api_gateway_deployment.apigwdeploy.stage_name
+    domain_name = aws_api_gateway_domain_name.api_endpoint_domain.domain_name
     base_path   = ""
 }
 
@@ -310,19 +310,19 @@ resource "aws_cognito_user_pool" "user_pool" {
 
 resource "aws_cognito_user_pool_domain" "authdomain" {
     domain       = "${var.authdomain}-${var.env}"
-    user_pool_id = "${aws_cognito_user_pool.user_pool.id}"
+    user_pool_id = aws_cognito_user_pool.user_pool.id
 }
 
 resource "aws_api_gateway_authorizer" "update_api_authoriser" {
     name            = "UrlShortenerApiAuthoriser-${var.env}"
-    rest_api_id     = "${aws_api_gateway_rest_api.apigw.id}"
+    rest_api_id     = aws_api_gateway_rest_api.apigw.id
     type            = "COGNITO_USER_POOLS"
-    provider_arns   = ["${aws_cognito_user_pool.user_pool.arn}"]
+    provider_arns   = [aws_cognito_user_pool.user_pool.arn]
 }
 
 resource "aws_cognito_user_pool_client" "app_client" {
     name                            = "client"
-    user_pool_id                    = "${aws_cognito_user_pool.user_pool.id}"
+    user_pool_id                    = aws_cognito_user_pool.user_pool.id
     generate_secret                 = true
     callback_urls                   = [
         "https://${var.env}.${var.root_domain}/_login",
