@@ -88,7 +88,8 @@ data "aws_iam_policy_document" "lambda_permissions" {
             "dynamodb:PutItem",
             "dynamodb:GetItem",
             "dynamodb:UpdateItem",
-            "dynamodb:Query"
+            "dynamodb:Query",
+            "dynamodb:DeleteItem"
         ]
         resources   = [
             "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/UrlShortenerLinks_${var.env}",
