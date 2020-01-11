@@ -73,11 +73,20 @@ def api():
         )
         return success_json_response(link.__dict__)
     if action == "list":
+        # check if we have pagination instructions
+        page = None
+        page_size = 0
+        if "page" in request.json:
+            page = request.json["page"]
+            if "page_size" not in request.json:
+                raise BadRequestException("When 'page' is specified, 'page_size' should also specified")
+            page_size = request.json["page_size"]
         # get list of links from DDB
         links = Link.get_links_for_user(
             env = os.environ.get('environment_name'),
             userid = g.username
         )
+        links.sort(key=lambda x: x.creation_date, reverse=True)
         link_dicts = []
         for link in links:
             link_dicts = link_dicts + [link.__dict__]
