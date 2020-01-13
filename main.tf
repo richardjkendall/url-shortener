@@ -26,13 +26,13 @@ resource "null_resource" "lambda_packager" {
         always_run = uuid()
     }
     provisioner "local-exec" {
-        command = "mkdir -p ${path.root}/target_lambda"
+        command = "mkdir -p ${path.module}/target_lambda"
     }
     provisioner "local-exec" {
-        command = "pip3 install --upgrade --target=${path.root}/target_lambda -r requirements.txt"
+        command = "pip3 install --upgrade --target=${path.module}/target_lambda -r requirements.txt"
     }
     provisioner "local-exec" {
-        command = "cp -R ${path.root}/*.py ${path.root}/target_lambda/."
+        command = "cp -R ${path.module}/*.py ${path.module}/target_lambda/."
     }
 }
 
@@ -326,7 +326,6 @@ resource "aws_cognito_user_pool_client" "app_client" {
     user_pool_id                    = aws_cognito_user_pool.user_pool.id
     generate_secret                 = true
     callback_urls                   = [
-        "https://${var.env}.${var.root_domain}/_login",
         "https://ui.${var.endpoint}/",
         "http://localhost:3000/"
     ]

@@ -7,20 +7,20 @@ resource "null_resource" "ui_packager" {
     always_run = uuid()
   }
   provisioner "local-exec" {
-    command = "mkdir -p ${path.root}/ui_package"
+    command = "mkdir -p ${path.module}/ui_package"
   }
   provisioner "local-exec" {
-    command = "find ${path.root}/ui_package -mindepth 1 -delete "
+    command = "find ${path.module}/ui_package -mindepth 1 -delete "
   }
   provisioner "local-exec" {
     command = "git clone https://github.com/richardjkendall/url-shortener-front-end.git ui_package/"
   }
   provisioner "local-exec" {
-    working_dir = "${path.root}/ui_package/"
+    working_dir = "${path.module}/ui_package/"
     command = "npm install"
   }
   provisioner "local-exec" {
-    working_dir = "${path.root}/ui_package/"
+    working_dir = "${path.module}/ui_package/"
     command = "npm run build"
   }
 }
@@ -30,16 +30,16 @@ resource "null_resource" "ui_copy" {
     always_run = uuid()
   }
   provisioner "local-exec" {
-    working_dir = "${path.root}/ui_package/build"
+    working_dir = "${path.module}/ui_package/build"
     command = "aws s3 sync . s3://${aws_s3_bucket.ui_bucket.id}"
   }
   depends_on = [null_resource.ui_packager]
 }
 
 resource "aws_s3_bucket" "ui_bucket" {
-  bucket = "ui.${var.endpoint}"
-
-  acl = "private"
+  bucket        = "ui.${var.endpoint}"
+  acl           = "private"
+  force_destroy = true
 
   cors_rule {
     allowed_methods = ["HEAD", "GET", "PUT", "POST"]
