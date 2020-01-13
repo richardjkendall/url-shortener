@@ -38,4 +38,4 @@ authdomain|Name for the Cognito domain used for authentication|n/a
 2. Create a file called ``terraform.tfvars`` in the root folder and add the variables defined above along with the values you want to use for them
 3. Run ``terraform init`` then ``terraform plan`` and if you are happy with the output run ``terraform apply``
 
-Note: I recommend usins remote state management e.g. S3.  I use terragrunt to automate all this for me. 
+Note: I recommend using remote state management e.g. S3.  I use terragrunt to automate all this for me. 
