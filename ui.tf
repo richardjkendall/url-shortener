@@ -2,9 +2,13 @@ locals {
   origin_id = join("-", ["access-identity", "ui", var.endpoint])
 }
 
+data "external" "ui_commit" {
+  program = ["bash", "git ls-remote https://github.com/richardjkendall/url-shortener-front-end.git HEAD awk '{ print $1}'"]
+}
+
 resource "null_resource" "ui_packager" {
   triggers = {
-    always_run = uuid()
+    always_run = data.external.ui_commit.result
   }
   provisioner "local-exec" {
     command = "mkdir -p ${path.module}/ui_package"
