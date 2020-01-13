@@ -327,10 +327,12 @@ resource "aws_cognito_user_pool_client" "app_client" {
     generate_secret                 = true
     callback_urls                   = [
         "https://${var.env}.${var.root_domain}/_login",
-        "http://localhost:3000/_login.html"
+        "https://ui.${var.endpoint}/",
+        "http://localhost:3000/"
     ]
     supported_identity_providers    = ["COGNITO"]
     allowed_oauth_flows             = ["implicit"]
     allowed_oauth_scopes            = ["email", "openid"]
     allowed_oauth_flows_user_pool_client = true
 }
+

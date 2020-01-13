@@ -68,7 +68,7 @@ def api():
         link = Link.create_link(
             env = os.environ.get('environment_name'),
             userid = g.username,
-            linkid = get_rand_string(6),
+            linkid = get_rand_string(4),
             url = request.json["url"]
         )
         return success_json_response(link.__dict__)
@@ -90,7 +90,37 @@ def api():
         link_dicts = []
         for link in links:
             link_dicts = link_dicts + [link.__dict__]
-        return success_json_response(link_dicts)
+        total_length = len(link_dicts)
+        # we need to filter the list if we were asked to
+        filtered = False
+        if "filter" in request.json:
+            if len(request.json["filter"]["url"]) > 0:
+                link_dicts = [l for l in link_dicts if request.json["filter"]["url"] in l["url"]]
+            if len(request.json["filter"]["linkid"]) > 0:
+                link_dicts = [l for l in link_dicts if request.json["filter"]["linkid"] in l["linkid"]]
+            total_length = len(link_dicts)
+            filtered = True
+        # if we are in pagination mode, need to get and return only the page wanted
+        if page is not None:
+            start_index = int(page) * int(page_size)
+            if start_index > total_length:
+                raise BadRequestException("No page with that page number exists")
+            end_index = start_index + int(page_size)
+            if end_index > total_length:
+                end_index = total_length
+            # now return slice of the array
+            return success_json_response({
+                "links": link_dicts[start_index:end_index],
+                "total_number": total_length,
+                "page": page,
+                "filtered": filtered
+            })
+        else:
+            return success_json_response({
+                "links": link_dicts,
+                "total_number": total_length,
+                "filtered": filtered
+            })
     if action == "update":
         # change existing URL, assuming the current user is the owner
         # check we have the mandatory fields

@@ -6,6 +6,7 @@ __pycache__/**
 
 function.zip
 target_lambda/**
+ui_package/**
 env/**
 
 *.tfstate*
