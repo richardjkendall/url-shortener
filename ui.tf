@@ -31,7 +31,7 @@ resource "null_resource" "ui_packager" {
 
 resource "null_resource" "ui_copy" {
   triggers = {
-    always_run = uuid()
+    always_run = data.external.ui_commit.result
   }
   provisioner "local-exec" {
     working_dir = "${path.module}/ui_package/build"
